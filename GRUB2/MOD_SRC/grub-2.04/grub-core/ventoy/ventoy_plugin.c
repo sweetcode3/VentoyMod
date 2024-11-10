@@ -3654,4 +3654,140 @@ grub_err_t ventoy_cmd_pop_menulang(grub_extcmd_context_t ctxt, int argc, char **
     VENTOY_CMD_RETURN(0);
 }
 
+// Добавляем новые структуры для поддержки многоуровневого меню
+struct ventoy_submenu {
+    char *name;
+    int level;
+    struct ventoy_submenu *parent;
+    struct ventoy_submenu **children;
+    int child_count;
+    struct ventoy_img_item **entries;
+    int entry_count;
+};
 
+// Функция для создания нового подменю
+static struct ventoy_submenu* ventoy_create_submenu(const char *name, int level, struct ventoy_submenu *parent) {
+    struct ventoy_submenu *submenu = grub_zalloc(sizeof(struct ventoy_submenu));
+    if (!submenu) {
+        return NULL;
+    }
+    
+    submenu->name = grub_strdup(name);
+    submenu->level = level;
+    submenu->parent = parent;
+    submenu->children = NULL;
+    submenu->child_count = 0;
+    submenu->entries = NULL;
+    submenu->entry_count = 0;
+    
+    return submenu;
+}
+
+// Функция для добавления элемента в подменю
+static int ventoy_add_submenu_entry(struct ventoy_submenu *submenu, struct ventoy_img_item *item) {
+    struct ventoy_img_item **new_entries;
+    
+    new_entries = grub_realloc(submenu->entries, 
+                              (submenu->entry_count + 1) * sizeof(struct ventoy_img_item *));
+    if (!new_entries) {
+        return 0;
+    }
+    
+    submenu->entries = new_entries;
+    submenu->entries[submenu->entry_count] = item;
+    submenu->entry_count++;
+    
+    return 1;
+}
+
+// Функция для добавления дочернего подменю
+static int ventoy_add_child_submenu(struct ventoy_submenu *parent, struct ventoy_submenu *child) {
+    struct ventoy_submenu **new_children;
+    
+    new_children = grub_realloc(parent->children, 
+                               (parent->child_count + 1) * sizeof(struct ventoy_submenu *));
+    if (!new_children) {
+        return 0;
+    }
+    
+    parent->children = new_children;
+    parent->children[parent->child_count] = child;
+    parent->child_count++;
+    
+    return 1;
+}
+
+// Функция для парсинга JSON и создания структуры меню
+static struct ventoy_submenu* ventoy_parse_json_menu(const char *json_data) {
+    grub_json_t *json = NULL;
+    grub_json_t *menu_array = NULL;
+    struct ventoy_submenu *root = NULL;
+    
+    if (grub_json_parse(&json, json_data)) {
+        return NULL;
+    }
+    
+    menu_array = grub_json_get_array(json, "menu");
+    if (menu_array) {
+        root = ventoy_create_submenu("ROOT", 0, NULL);
+        if (root) {
+            // Рекурсивный парсинг подменю
+            ventoy_parse_submenu(menu_array, root);
+        }
+    }
+    
+    grub_json_free(json);
+    return root;
+}
+
+// Функция для создания элементов меню GRUB
+static void ventoy_create_grub_menu(struct ventoy_submenu *submenu) {
+    int i;
+    char *escaped_name;
+    
+    if (!submenu) {
+        return;
+    }
+    
+    // Создаем подменю если это не корневой элемент
+    if (submenu->level > 0) {
+        escaped_name = ventoy_escape_string(submenu->name);
+        grub_printf("submenu \"%s\" {\n", escaped_name);
+        grub_free(escaped_name);
+    }
+    
+    // Добавляем записи текущего подменю
+    for (i = 0; i < submenu->entry_count; i++) {
+        ventoy_create_menu_entry(submenu->entries[i]);
+    }
+    
+    // Рекурсивно обрабатываем дочерние подменю
+    for (i = 0; i < submenu->child_count; i++) {
+        ventoy_create_grub_menu(submenu->children[i]);
+    }
+    
+    // Закрываем подменю
+    if (submenu->level > 0) {
+        grub_printf("}\n");
+    }
+}
+
+// Модифицированная функция ventoy_json_plugin_menu_process
+grub_err_t ventoy_json_plugin_menu_process(const char *json_path) {
+    char *json_data;
+    struct ventoy_submenu *root;
+    
+    json_data = ventoy_read_json_file(json_path);
+    if (!json_data) {
+        return GRUB_ERR_FILE_READ_ERROR;
+    }
+    
+    root = ventoy_parse_json_menu(json_data);
+    if (root) {
+        ventoy_create_grub_menu(root);
+        ventoy_free_submenu_structure(root);
+    }
+    
+    grub_free(json_data);
+    return GRUB_ERR_NONE;
+}

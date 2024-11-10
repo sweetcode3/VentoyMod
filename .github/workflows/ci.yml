@@ -17,8 +17,8 @@ jobs:
     - name: Install yum-utils and configure yum
       run: |
         sudo apt-get update
-        sudo apt-get install -y yum-utils
-        yum-config-manager --save --setopt=base.skip_if_unavailable=true  
+        sudo apt-get install -y dnf
+        sudo dnf config-manager --setopt=base.skip_if_unavailable=true --save
     - name: Install Docker Compose
       run: |
           sudo curl -L "https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose

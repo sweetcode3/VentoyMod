@@ -5,7 +5,6 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-  
   workflow_dispatch:
 
 jobs:
@@ -14,38 +13,43 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install yum-utils and configure yum
+    - name: Configure package manager
       run: |
         sudo apt-get update
         sudo apt-get install -y dnf
-        sudo dnf config-manager --setopt=base.skip_if_unavailable=true --save
+        sudo dnf install -y 'dnf-command(config-manager)'
+        sudo dnf config-manager --setopt=base.skip_if_unavailable=true --save --releasever=9
+        sudo dnf config-manager --setopt=updates.skip_if_unavailable=true --save --releasever=9
+        sudo dnf config-manager --setopt=extras.skip_if_unavailable=true --save --releasever=9
+
     - name: Install Docker Compose
       run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-    - name: Configure YUM repositories
-      run: |
-        yum-config-manager --save --setopt=base.skip_if_unavailable=true
-        yum-config-manager --save --setopt=updates.skip_if_unavailable=true
-        yum-config-manager --save --setopt=extras.skip_if_unavailable=true
+        sudo curl -L "https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+
     - name: Run Docker Compose
       run: docker-compose up
+
     - uses: actions/upload-artifact@v3
       with:
         name: ventoy-windows
         path: INSTALL/ventoy-*windows*
+
     - uses: actions/upload-artifact@v3
       with:
         name: ventoy-linux
         path: INSTALL/ventoy-*linux*
+
     - uses: actions/upload-artifact@v3
       with:
         name: ventoy-livecd
         path: INSTALL/ventoy-*livecd*
+
     - uses: actions/upload-artifact@v3
       with:
         name: SHA256SUM
         path: INSTALL/sha256.txt
+
     - uses: actions/upload-artifact@v3
       with:
         name: xxx-build-log

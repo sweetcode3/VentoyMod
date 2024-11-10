@@ -5,7 +5,6 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-  
   workflow_dispatch:
 
 jobs:
@@ -13,24 +12,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Run docker-compose up
-      run: docker-compose up
+
+    - name: Install Docker and Docker Compose
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ca-certificates curl gnupg
+        sudo install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        sudo chmod a+r /etc/apt/keyrings/docker.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    - name: Run Docker Compose
+      run: docker compose up
+
     - uses: actions/upload-artifact@v3
       with:
         name: ventoy-windows
         path: INSTALL/ventoy-*windows*
+
     - uses: actions/upload-artifact@v3
       with:
         name: ventoy-linux
         path: INSTALL/ventoy-*linux*
+
     - uses: actions/upload-artifact@v3
       with:
         name: ventoy-livecd
         path: INSTALL/ventoy-*livecd*
+
     - uses: actions/upload-artifact@v3
       with:
         name: SHA256SUM
         path: INSTALL/sha256.txt
+
     - uses: actions/upload-artifact@v3
       with:
         name: xxx-build-log
